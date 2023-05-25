@@ -49,9 +49,3 @@ All logging files in the training process, *e.g.*, log message, checkpoints, and
    ```bash
    python mmsr/train.py -opt "options/train/train.yml"
    ```
-
-## Visual Results
-
-For more results on the CUFED and Webly_SR benchmarks, you can directly download our results from [here](https://drive.google.com/drive/folders/1tgTv5UZGZVoTo6GYtm-7ud8f-5w3eJRm?usp=sharing).
-
-
