@@ -21,6 +21,7 @@ _model_modules = [
 
 def create_model(opt):
     """Create model.
+
     Args:
         opt (dict): Configuration. It constains:
             model_type (str): Model type.

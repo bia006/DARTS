@@ -1,0 +1,4 @@
+mmcv-full==1.7.0
+numpy
+torch==1.11.0+cu102
+torchvision==0.12.0+cu102
