@@ -5,11 +5,6 @@
 
 1. Create Conda Environment
 
-   ```bash
-   conda create --name c2_matching python=3.8
-   conda activate c2_matching
-   ```
-
 2. Install Dependencies
 
    ```bash
