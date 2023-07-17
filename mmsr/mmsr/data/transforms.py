@@ -153,22 +153,8 @@ def augment(img_list, hflip=True, rotation=True, jitter=True, solar=True, blur=T
     hflip = hflip and random.random() < 0.5
     vflip = rotation and random.random() < 0.5
     rot90 = rotation and random.random() < 0.5
-    jitter = jitter and random.random() < 0.5
-    solar = solar and random.random() < 0.2
-    blur = blur and random.random() < 0.2
-    gray = gray and random.random() < 0.5
 
     def _augment(img):
-        if jitter:
-            transforms.RandomApply([
-            transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)  # not strengthened
-        ]),
-        if solar:
-            transforms.RandomApply([Solarization(0.2)]),
-        if blur:
-            transforms.RandomApply([GaussianBlur(0.2)]),
-        if gray:
-            transforms.RandomGrayscale(),
         if hflip:
             mmcv.imflip_(img, 'horizontal')
         if vflip:
@@ -178,16 +164,6 @@ def augment(img_list, hflip=True, rotation=True, jitter=True, solar=True, blur=T
         return img
 
     def _augment_flow(flow):
-        if jitter:
-            flow = transforms.RandomApply([
-            transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)  # not strengthened
-        ]),
-        if solar:
-            transforms.RandomApply([Solarization(0.2)]),
-        if blur:
-            transforms.RandomApply([GaussianBlur(0.2)]),
-        if gray:
-            transforms.RandomGrayscale(),
         if hflip:
             mmcv.imflip_(flow, 'horizontal')
             flow[:, :, 0] *= -1

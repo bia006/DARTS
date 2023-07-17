@@ -13,25 +13,18 @@ from mmsr.utils import FileClient
 
 target_size = (160, 160)
 padding_size = (160, 160)
-# padding_size = (512, 512)
 
 def center_crop(image_name, target_S=(80,80)):
 
     img_size = image_name.size
     target_h, target_w = target_S[0], target_S[1]
 
-    # x_max = img_size[0] - target_h
-    # y_max = img_size[1] - target_w
-
     left = (img_size[0] - target_h)/2
     top = (img_size[1] - target_w)/2
     right = (img_size[0] + target_h)/2
     bottom = (img_size[1] + target_w)/2
     for i in range(1):
-        # random_x = randrange(0, x_max//2 + 1) * 2
-        # random_y = randrange(0, y_max//2 + 1) * 2
-
-        # area = (random_x, random_y, random_x + target_h, random_y + target_w)
+      
         area = (left, top, right, bottom)
         c_img = image_name.crop(area)
 
@@ -50,10 +43,6 @@ def random_crop(image_name, random_size):
     x_max = img_size[0] - target_h
     y_max = img_size[1] - target_w
 
-    # left = (img_size[0] - target_h)/2
-    # top = (img_size[1] - target_w)/2
-    # right = (img_size[0] + target_h)/2
-    # bottom = (img_size[1] + target_w)/2
     for i in range(1):
         random_x = randrange(0, x_max//2 + 1) * 2
         random_y = randrange(0, y_max//2 + 1) * 2
@@ -165,75 +154,6 @@ class RefCUFEDDataset(data.Dataset):
                                       self.opt['use_rot'])
 
         else:
-        #     # for testing phase, zero padding to image pairs for same size
-        #     # img_in_pil = img_in * 255
-        #     # img_in_pil = Image.fromarray(
-        #     #     cv2.cvtColor(img_in_pil.astype(np.uint8), cv2.COLOR_BGR2RGB))
-
-        #     # img_ref_pil = img_ref * 255
-        #     # img_ref_pil = Image.fromarray(
-        #     #     cv2.cvtColor(img_ref_pil.astype(np.uint8), cv2.COLOR_BGR2RGB))
-        #     img_in = mod_crop(img_in, scale)
-        #     img_in_gt = img_in.copy()
-        #     img_ref = mod_crop(img_ref, scale)
-        #     img_in_h, img_in_w, _ = img_in.shape
-        #     img_ref_h, img_ref_w, _ = img_ref.shape
-        #     padding = False
-        #     target_h, target_w = padding_size[0], padding_size[1]
-            
-        #     if img_in_h != img_ref_h or img_in_w != img_ref_w:
-        #         padding = True
-        #         target_h = max(img_in_h, img_ref_h)
-        #         target_w = max(img_in_w, img_ref_w)
-        #         img_in = mmcv.impad(
-        #             img_in, shape=(target_h, target_w), pad_val=0)
-        #         img_ref = mmcv.impad(
-        #             img_ref, shape=(target_h, target_w), pad_val=0)
-
-        #     gt_h, gt_w, _ = img_in.shape
-
-        # # downsample image using PIL bicubic kernel
-        # lq_h, lq_w = gt_h // scale, gt_w // scale
-
-        # img_in_pil = img_in * 255
-        # img_in_pil = Image.fromarray(
-        #     cv2.cvtColor(img_in_pil.astype(np.uint8), cv2.COLOR_BGR2RGB))
-
-        # img_ref_pil = img_ref * 255
-        # img_ref_pil = Image.fromarray(
-        #     cv2.cvtColor(img_ref_pil.astype(np.uint8), cv2.COLOR_BGR2RGB))
-        
-        # # img_in_pil = center_crop(img_in_pil, target_S=(160,160))
-        # # img_ref_pil = center_crop(img_ref_pil, target_S=(160,160))
-        
-        # img_in_h, img_in_w = img_in_pil.size
-        # img_ref_h, img_ref_w = img_ref_pil.size
-        # target_h, target_w = padding_size[0], padding_size[1]
-        # if img_in_h != img_ref_h or img_in_w != img_ref_w:
-        #     padding = True
-        #     target_h = max(img_in_h, img_ref_h)
-        #     target_w = max(img_in_w, img_ref_w)
-        #     img_in_pil = img_padding(img_in_pil, (target_h - img_in_h)//2, (target_h - img_in_h)//2, 
-        #                                              (target_w - img_in_w)//2, (target_w - img_in_w)//2)
-        #     img_in_pil = img_in_pil.resize((target_h, target_w), Image.BICUBIC)
-            
-        # # if img_ref_h != target_h or img_ref_w != target_w:
-        #     img_ref_pil = img_padding(img_ref_pil, (target_h - img_in_h)//2, (target_h - img_in_h)//2, 
-        #                                              (target_w - img_in_w)//2, (target_w - img_in_w)//2)           
-        #     img_ref_pil = img_ref_pil.resize((target_h, target_w), Image.BICUBIC)
-
-        # gt_h, gt_w, _ = img_in.shape
-        # lq_h, lq_w = gt_h // scale, gt_w // scale
-        # img_in_lq = img_in_pil.resize((40, 40), Image.BICUBIC)
-
-        # img_ref_lq1 = random_crop(img_ref_pil, random_size=(40,40))
-        # img_ref_lq = random_crop(img_ref_pil, random_size=(80,80))
-        # img_ref_g = random_crop(img_ref_pil, random_size=(160,160))
-
-        # # bicubic upsample LR
-        # img_in_up = img_in_lq.resize((160, 160), Image.BICUBIC)
-        # img_ref_up = img_ref_lq.resize((160, 160), Image.BICUBIC)
-        # for testing phase, zero padding to image pairs for same size
             img_in = mod_crop(img_in, scale)
             img_in_gt = img_in.copy()
             img_ref = mod_crop(img_ref, scale)
@@ -282,10 +202,6 @@ class RefCUFEDDataset(data.Dataset):
         img_ref_lq1 = random_crop(img_ref_pil, random_size=(40,40))
         img_ref_lq = random_crop(img_ref_pil, random_size=(80,80))
         img_ref_g = center_crop(img_ref_pil, (160,160))
-        
-        # img_ref_lq1 = random_crop(img_ref_pil, random_size=(128,128))
-        # img_ref_lq = random_crop(img_ref_pil, random_size=(256,256))
-        # img_ref_g = random_crop(img_ref_pil, random_size=(512,512))
         
         # bicubic upsample LR
         img_in_up = img_in_lq.resize((gt_w, gt_h), Image.BICUBIC)
@@ -337,3 +253,4 @@ class RefCUFEDDataset(data.Dataset):
 
     def __len__(self):
         return len(self.paths)
+

@@ -11,7 +11,6 @@ import mmsr.models.lr_scheduler as lr_scheduler
 
 logger = logging.getLogger('base')
 
-
 class BaseModel():
     """Base model.
     """
@@ -78,6 +77,7 @@ class BaseModel():
     def setup_schedulers(self):
         """Set up schedulers."""
         train_opt = self.opt['train']
+        lr_lambda = 1.0 - max(0, train_opt['niter'] + train_opt['niter']//3000 - train_opt['niter']//2) / float(train_opt['niter']//2 + 1)
         if train_opt['lr_scheme'] == 'MultiStepLR':
             for optimizer in self.optimizers:
                 self.schedulers.append(
@@ -103,6 +103,22 @@ class BaseModel():
                         eta_min=train_opt['eta_min'],
                         restarts=train_opt['restarts'],
                         restart_weights=train_opt['restart_weights']))
+        elif train_opt['lr_scheme'] == 'OneCycleLR':
+            for optimizer in self.optimizers:
+                self.schedulers.append(
+                    torch.optim.lr_scheduler.OneCycleLR(
+                        optimizer,
+                        max_lr=train_opt['lr_g'],
+                        pct_start=train_opt['warmup'] / train_opt['num_train_steps'],
+                        anneal_strategy=train_opt['lr_decay'],
+                        total_steps=train_opt['num_train_steps']))
+        elif train_opt['lr_scheme'] == 'LinearLR':
+            for optimizer in self.optimizers:
+                self.schedulers.append(
+                    torch.optim.lr_scheduler.LambdaLR(
+                        optimizer,
+                        lr_lambda=lr_lambda))
+                        
         else:
             raise NotImplementedError(
                 f"{train_opt['lr_scheme']} learning rate scheme is not "
