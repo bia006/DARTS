@@ -1,4 +1,4 @@
-## Prepare Test Set
+## Prepare TestSet
 
 ### Prepare CUFED5 dataset
 
@@ -9,7 +9,9 @@
 - CUFED5
 |--- 000_0.png
 |--- 000_1.png
+|--- 000_2.png
 |--- ...
+|--- 125_3.png
 |--- 125_4.png
 |--- 125_5.png
 ```
