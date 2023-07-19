@@ -4,17 +4,17 @@ This repository contains the implementation of the following paper:
 > **DARTS: Double Attention Reference-based Transformer for Super-resolution**<br>
 > Masoomeh Aslahishahri, Jordan Ubbens, Ian Stavness<br>
 
-[[Paper]()]
+[[Paper](https://arxiv.org/pdf/2307.08837.pdf)]
 
 ## Overview
-![overall_structure](./assets/overview.jpg)
+![overall_structure](./assets/overview_resized.jpg)
 
 ## Dependencies and Installation
 
 1. Clone Repo
 
    ```bash
-   git clone git@github.com:yumingj/C2-Matching.git
+   git clone https://github.com/bia006/DARTS.git
    ```
 
 2. Create Conda Environment
@@ -71,28 +71,18 @@ All logging files in the training process, *e.g.*, log message, checkpoints, and
    
    ## Visual Results
 
-For more results on the benchmarks, you can directly download our C2-Matching results from [here](kskfhjkgs).
+For more results on the benchmarks, you can directly download our DARTS results from [here](https://drive.google.com/file/d/1Q-wVgMd4ByG5HvY1D9YPv9eWE8aYPUuR/view?usp=sharing).
 
 ![result](assets/results.jpg)
 
 ## Citation
 
-   If you find our repo useful for your research, please cite our paper:
-
-   ```bibtex
-   @inproceedings{jiang2021robust,
-     title={Robust Reference-based Super-Resolution via C2-Matching},
-     author={Jiang, Yuming and Chan, Kelvin CK and Wang, Xintao and Loy, Chen Change and Liu, Ziwei},
-     booktitle={Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition},
-     pages={2103--2112},
-     year={2021}
-   }
-   ```
+   If you find our repo useful for your research, please cite our paper.
 
 
 ## License and Acknowledgement
 
-This project is open sourced under MIT license. The code framework is mainly modified from [C2-Matching](https://github.com/yumingj/C2-Matching/tree/master). Please refer to the original repo for more usage and documents.
+This project is open sourced under MIT license. The code framework is mainly modified from [StyleSwin](https://github.com/microsoft/StyleSwin). Please refer to the original repo for more usage and documents.
 
 
 ## Contact

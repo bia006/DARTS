@@ -103,22 +103,6 @@ class BaseModel():
                         eta_min=train_opt['eta_min'],
                         restarts=train_opt['restarts'],
                         restart_weights=train_opt['restart_weights']))
-        elif train_opt['lr_scheme'] == 'OneCycleLR':
-            for optimizer in self.optimizers:
-                self.schedulers.append(
-                    torch.optim.lr_scheduler.OneCycleLR(
-                        optimizer,
-                        max_lr=train_opt['lr_g'],
-                        pct_start=train_opt['warmup'] / train_opt['num_train_steps'],
-                        anneal_strategy=train_opt['lr_decay'],
-                        total_steps=train_opt['num_train_steps']))
-        elif train_opt['lr_scheme'] == 'LinearLR':
-            for optimizer in self.optimizers:
-                self.schedulers.append(
-                    torch.optim.lr_scheduler.LambdaLR(
-                        optimizer,
-                        lr_lambda=lr_lambda))
-                        
         else:
             raise NotImplementedError(
                 f"{train_opt['lr_scheme']} learning rate scheme is not "

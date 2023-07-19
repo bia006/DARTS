@@ -1,4 +1,0 @@
-# ninja log v5
-0	16352	1672932522807016595	/data/home/bia006/C2-Matching/kernels/window_process/build/temp.linux-x86_64-cpython-38/swin_window_process.o	4a7d8195fc1f523
-0	72493	1672932578967282459	/data/home/bia006/C2-Matching/kernels/window_process/build/temp.linux-x86_64-cpython-38/swin_window_process_kernel.o	e254b6e852f5dc12
-24	13882	1672934899390370443	/data/home/bia006/C2-Matching/kernels/window_process/build/temp.linux-x86_64-cpython-38/swin_window_process.o	4a7d8195fc1f523

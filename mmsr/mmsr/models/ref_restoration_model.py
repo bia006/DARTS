@@ -4,14 +4,13 @@ import os.path as osp
 from collections import OrderedDict
 
 import mmcv
-import lpips
 import numpy as np
 import torch
 from timm.loss import LabelSmoothingCrossEntropy, SoftTargetCrossEntropy
 from torch.nn import functional as F
 from torch import autograd, nn, optim
 from torchvision.models import vgg19
-# from torch.optim import lr_scheduler
+from torch.optim import lr_scheduler
 
 import mmsr.models.networks as networks
 import mmsr.utils.metrics as metrics
@@ -22,14 +21,6 @@ from .CR_DiffAug_file import CR_DiffAug
 
 loss_module = importlib.import_module('mmsr.models.losses')
 logger = logging.getLogger('base')
-
-def accumulate(model1, model2, decay=0.999):
-    par1 = dict(model1.named_parameters())
-    par2 = dict(model2.named_parameters())
-
-    for k in par1.keys():
-        par1[k].data.mul_(decay).add_(par2[k].data, alpha=1 - decay)
-
 
 def d_logistic_loss(real_pred, fake_pred):
     assert type(real_pred) == type(fake_pred), "real_pred must be the same type as fake_pred"
@@ -46,94 +37,10 @@ def d_r1_loss(real_pred, real_img):
     return grad_penalty
 
 
-def g_nonsaturating_loss(fake_pred):
-    loss = F.softplus(-fake_pred).mean()
-    return loss
-
-def set_grad_none(model, targets):
-    for n, p in model.named_parameters():
-        if n in targets:
-            p.grad = None
-
-def loss_fn(output, target, g_t, lambda_ = 1):
-  T = len(g_t)
-  # loss = -nn.LogSoftmax(output[target], dim = 1) + (lambda_ * torch.sum(g_t))/T
-  loss = F.cross_entropy(output, target) + (lambda_ * torch.sum(g_t))/T
-  return loss
-
-# def requires_grad(model, flag=True):
-#     for p in model.parameters():
-#         p.requires_grad = flag      
-
-def cosine_scheduler(base_value, final_value, epochs, niter_per_ep, warmup_epochs=0, start_warmup_value=0):
-    warmup_schedule = np.array([])
-    warmup_iters = warmup_epochs * niter_per_ep
-    if warmup_epochs > 0:
-        warmup_schedule = np.linspace(start_warmup_value, base_value, warmup_iters)
-
-    iters = np.arange(epochs * niter_per_ep - warmup_iters)
-    schedule = final_value + 0.5 * (base_value - final_value) * (1 + np.cos(np.pi * iters / len(iters)))
-
-    schedule = np.concatenate((warmup_schedule, schedule))
-    assert len(schedule) == epochs * niter_per_ep
-    return schedule
-
-
-class VGG(nn.Module):
-    'Pretrained VGG-19 model features.'
-    def __init__(self, layers=(0), replace_pooling = False):
-        super(VGG, self).__init__()
-        self.layers = layers
-        self.instance_normalization = nn.InstanceNorm2d(128)
-        self.relu = nn.ReLU()
-        self.model = vgg19(pretrained=True).features
-        # Changing Max Pooling to Average Pooling
-        if replace_pooling:
-            self.model._modules['4'] = nn.AvgPool2d((2,2), (2,2), (1,1))
-            self.model._modules['9'] = nn.AvgPool2d((2,2), (2,2), (1,1))
-            self.model._modules['18'] =nn.AvgPool2d((2,2), (2,2), (1,1))
-            self.model._modules['27'] =nn.AvgPool2d((2,2), (2,2), (1,1))
-            self.model._modules['36'] = nn.AvgPool2d((2,2), (2,2), (1,1))
-        for param in self.model.parameters():
-            param.requires_grad = False
-
-    def forward(self, x):
-        features = []
-        for name, layer in enumerate(self.model):
-            x = layer(x)
-            if name in self.layers:
-                features.append(x)
-                if len(features) == len(self.layers):
-                    break
-        return features
-    
-def gram_matrix(y):
-    (b, ch, h, w) = y.size()
-    features = y.view(b, ch, w * h)
-    features_t = features.transpose(1, 2)
-    gram = features.bmm(features_t) / (ch * h * w)
-    return gram
-# def requires_grad(model, flag=True):
-#     for p in model.parameters():
-#         p.requires_grad = flag
-
-net_lp = lpips.LPIPS(net='vgg').cuda()
-
 class SwinTransformerModel(SRModel):
 
     def __init__(self, opt):
         super(SwinTransformerModel, self).__init__(opt)
-
-        # net_map does not have any trainable parameters.
-        self.net_map = networks.define_net_map(opt)
-        self.net_map = self.model_to_device(self.net_map)
-        # define network for feature extraction
-        self.net_extractor = networks.define_net_extractor(opt)
-        self.net_extractor = self.model_to_device(self.net_extractor)
-        self.print_network(self.net_extractor)
-        # load pretrained feature extractor
-        load_path = self.opt['path'].get('pretrain_model_feature_extractor',
-                                         None)
 
         # load pretrained models
         load_path = self.opt['path'].get('pretrain_model_g', None)
@@ -149,51 +56,24 @@ class SwinTransformerModel(SRModel):
             
             weight_decay_g = train_opt.get('weight_decay_g', 0)
             optim_params_g = []
-            optim_params_offset = []
-            optim_params_relu2_offset = []
-            optim_params_relu3_offset = []
-            if train_opt.get('lr_relu3_offset', None):
-                optim_params_relu3_offset = []
-            for name, v in self.net_g.named_parameters():
-                if v.requires_grad:
-                    if 'offset' in name:
-                        if 'small' in name:
-                            logger.info(name)
-                            optim_params_relu3_offset.append(v)
-                        elif 'medium' in name:
-                            logger.info(name)
-                            optim_params_relu2_offset.append(v)
-                        else:
-                            optim_params_offset.append(v)
-                    else:
-                        optim_params_g.append(v)
-
+           
             self.optimizer_g = torch.optim.Adam(
                 [{
                     'params': optim_params_g
-                }, {
-                    'params': optim_params_offset,
-                    'lr': train_opt['lr_offset']
-                }, {
-                    'params': optim_params_relu3_offset,
-                    'lr': train_opt['lr_relu3_offset']
-                }, {
-                    'params': optim_params_relu2_offset,
-                    'lr': train_opt['lr_relu2_offset']
-                }],
+                }], 
                 lr=train_opt['lr_g'],
                 weight_decay=weight_decay_g,
                 betas=train_opt['beta_g'])
 
             self.optimizers.append(self.optimizer_g)
 
-            self.scheduler_g = torch.optim.lr_scheduler.OneCycleLR(
+            self.scheduler_g = lr_scheduler.OneCycleLR(
                         self.optimizer_g,
                         max_lr=train_opt['lr_g'],
                         pct_start=train_opt['warmup'] / train_opt['num_train_steps'],
                         anneal_strategy=train_opt['lr_decay'],
                         total_steps=train_opt['num_train_steps'])
-            # self.scheduler_d = torch.optim.lr_scheduler.OneCycleLR(
+            # self.scheduler_d = lr_scheduler.OneCycleLR(
             #             self.optimizer_d,
             #             max_lr=train_opt['lr_d'],
             #             pct_start=train_opt['warmup'] / train_opt['num_train_steps'],
@@ -220,38 +100,6 @@ class SwinTransformerModel(SRModel):
         if self.net_d:
             self.net_d.train()
 
-        if self.opt.get('network_teacher', None):
-            # define network net_d
-            self.net_teacher = networks.define_net_teacher(self.opt)
-            self.net_teacher = self.model_to_device(self.net_teacher)
-            self.print_network(self.net_teacher)
-            # load pretrained models
-            load_path = self.opt['path'].get('pretrain_model_t', None)
-            if load_path is not None:
-                self.load_network(self.net_teacher, load_path,
-                                  self.opt['path']['strict_load'])
-        else:
-            logger.info('No teacher.')
-            self.net_teacher = None
-        if self.net_teacher:
-            self.net_teacher.train()
-
-        if self.opt.get('network_classifier', None):
-            # define network net_classifier
-            self.net_classifier = networks.define_net_classifier(self.opt)
-            self.net_classifier = self.model_to_device(self.net_classifier)
-            self.print_network(self.net_classifier)
-            # load pretrained models
-            load_path = self.opt['path'].get('pretrain_model_classifier',
-                                             None)
-            if load_path is not None:
-                self.load_network(self.net_classifier, load_path,
-                              self.opt['path']['strict_load'])
-        else:
-            logger.info('No classifier.')
-            self.net_teacher = None
-
-
         # define losses
         if train_opt['pixel_weight'] > 0:
             cri_pix_cls = getattr(loss_module, train_opt['pixel_criterion'])
@@ -261,14 +109,6 @@ class SwinTransformerModel(SRModel):
         else:
             logger.info('Remove pixel loss.')
             self.cri_pix = None
-
-        if train_opt.get('Distillation_opt', None):
-            cri_distill_cls = getattr(loss_module, 'DistillationLoss')
-            self.cri_distill = cri_distill_cls(
-                **train_opt['Distillation_opt']).to(self.device)
-        else:
-            logger.info('Remove distill loss.')
-            self.cri_distill = None
 
         if train_opt.get('perceptual_opt', None):
             cri_perceptual_cls = getattr(loss_module, 'PerceptualLoss')
@@ -322,11 +162,6 @@ class SwinTransformerModel(SRModel):
         self.net_d_init_steps = train_opt['net_d_init_steps'] if train_opt[
             'net_d_init_steps'] else 0
 
-        self.net_teacher_steps = train_opt['net_teacher_steps'] if train_opt[
-            'net_teacher_steps'] else 1
-        self.net_teacher_init_steps = train_opt['net_teacher_init_steps'] if train_opt[
-            'net_teacher_init_steps'] else 0
-
         if self.net_d:
             weight_decay_d = train_opt.get('weight_decay_d', 0)
             self.optimizer_d = torch.optim.Adam(
@@ -335,10 +170,6 @@ class SwinTransformerModel(SRModel):
                 weight_decay=weight_decay_d,
                 betas=train_opt['beta_d'])
             self.optimizers.append(self.optimizer_d)
-
-        # check the schedulers
-        # self.setup_schedulers()
-        # self.scheduler.step()
 
         self.log_dict = OrderedDict()
 
@@ -349,25 +180,10 @@ class SwinTransformerModel(SRModel):
         self.img_ref_lq = data['img_ref_lq'].to(self.device) # ref HR downsampled
         self.img_ref_lq1 = data['img_ref_lq1'].to(self.device)
         self.gt = data['img_in'].to(self.device)  # gt HR
-        # self.gt_val = data['img_gt_val'].to(self.device)
-        # self.ref_val = data['img_ref_val'].to(self.device)
-
-        # self.img_in_pad = data['img_in_pad'].to(self.device) 
-        # self.img_ref_pad = data['img_ref_pad'].to(self.device) 
-        # self.img_in_t = data['img_in_t'].to(self.device) 
-        # self.img_ref_t = data['img_ref_t'].to(self.device) 
 
     def optimize_parameters(self, step):
-        self.features = self.net_extractor(self.img_in_up, self.img_ref)
-        self.pre_offset, self.img_ref_feat = self.net_map(
-            self.features, self.img_ref)
 
-        self.output, self.lr_gt = self.net_g(self.img_in_lq, self.img_ref_lq1, self.img_ref_lq, self.img_ref, self.img_ref_feat)
-
-        self.features_output = self.net_classifier(self.output)
-        self.features_gt = self.net_classifier(self.gt)
-        # with torch.no_grad():
-        #     self.teacher_outputs = self.net_teacher(self.img_in_lq, self.img_ref_lq1, self.gt, self.img_ref, self.img_ref_feat)
+        self.output = self.net_g(self.img_in_lq, self.img_ref_lq1, self.img_ref_lq, self.img_ref)
 
         if step <= self.net_g_pretrain_steps:
             # pretrain the net_g with pixel Loss
@@ -412,13 +228,6 @@ class SwinTransformerModel(SRModel):
                 l_d_total += 10 * l2_loss(fake_pred_aug, fake_d_pred) \
                 + 10 * l2_loss(real_pred_aug, real_d_pred)
 
-                # self.log_dict['l_d_total'] = l_d_total.item()
-                # if self.cri_grad_penalty and step//16 == 0:
-                #     l_grad_penalty = self.cri_grad_penalty(
-                #         self.net_d, self.gt, self.output)
-                #     self.log_dict['l_grad_penalty'] = l_grad_penalty.item()
-                #     l_d_total += l_grad_penalty
-
                 l_d_total.backward()
                 nn.utils.clip_grad_norm_(self.net_d.parameters(), 5.0)
                 self.optimizer_d.step()
@@ -435,48 +244,26 @@ class SwinTransformerModel(SRModel):
 
             # train net_g
             self.optimizer_g.zero_grad()
-            # self.optimizer_t.zero_grad()
             if self.net_d:
                 for p in self.net_d.parameters():
                     p.requires_grad = False
 
             l_g_total = 0
-            epoch = int(step//3200)
             if (step - self.net_g_pretrain_steps) % self.net_d_steps == 0 and (
                     step - self.net_g_pretrain_steps) > self.net_d_init_steps:
                 if self.cri_pix:
                     l_g_pix = self.cri_pix(self.output, self.gt)
                     l_g_total += l_g_pix
                     self.log_dict['l_g_pix'] = l_g_pix.item()
-                    
-                    # lpips = net_lp(self.output, self.gt).mean() * 1e-4
-                    # l_g_total += lpips
-                    # self.log_dict['lpips'] = lpips.item()
-
-                # if self.cri_distill:
-                #     l_g_distill = self.cri_distill(self.lr_output, self.teacher_outputs, epoch)
-                #     l_g_total += l_g_distill
-                #     self.log_dict['l_g_distill'] = l_g_distill.item()
-
-                # if self.cri_perceptual:
-                #     l_g_percep, _ = self.cri_perceptual(self.output, self.gt)
-                #     l_g_total += l_g_percep
-                #     self.log_dict['l_g_percep'] = l_g_percep.item()
+              
                 if self.cri_style:
                     _, l_g_style = self.cri_style(self.output, self.gt)
                     l_g_total += l_g_style
                     self.log_dict['l_g_style'] = l_g_style.item()
-
-                # if self.cri_texture:
-                #     self.weights = self.img_ref_feat['relu1_1']
-                #     l_g_texture = self.cri_texture(self.output, self.img_ref_feat, self.weights)
-                #     l_g_total += l_g_texture
-                #     self.log_dict['l_g_texture'] = l_g_texture.item()
                 
                 if self.net_d:
                     # gan loss
                     fake_g_pred = self.net_d(self.output)
-                    # l_g_gan = g_nonsaturating_loss(fake_g_pred)
                     l_g_gan = self.cri_gan(fake_g_pred, True, is_disc=False)
                     l_g_total += l_g_gan
                     self.log_dict['l_g_gan'] = l_g_gan.item()
@@ -487,28 +274,10 @@ class SwinTransformerModel(SRModel):
                 self.scheduler_g.step()
                 # self.scheduler_d.step()
                 
-            
-            
-            # # momentum parameter is increased to 1. during training with a cosine schedule
-            # momentum_schedule = cosine_scheduler(0.996, 1,
-            #                                    epoch + 1, 3200)
-            # # EMA update for the teacher
-            # it = 3200 * epoch + 1   # global training iteration
-            # with torch.no_grad():
-            #     m = momentum_schedule[it]  # momentum parameter
-            #     for param_q, param_k in zip(self.net_g.parameters(), self.net_teacher.parameters()):
-            #             param_k.data.mul_(m).add_((1 - m) * param_q.detach().data)
-
-
     def test(self):
         self.net_g.eval()
         with torch.no_grad():
-            self.features = self.net_extractor(self.img_in_up, self.img_ref)
-            self.pre_offset, self.img_ref_feat = self.net_map(
-            self.features, self.img_ref)
-            
-            # self.output, self.lr_output = self.net_g(self.img_in_lq, self.pre_offset, self.img_ref_feat)
-            self.output, self.lr_output = self.net_g(self.img_in_lq, self.img_ref_lq1, self.img_ref_lq, self.img_ref, self.img_ref_feat)
+            self.output = self.net_g(self.img_in_lq, self.img_ref_lq1, self.img_ref_lq, self.img_ref)
         self.net_g.train()
 
     def get_current_visuals(self):
@@ -521,22 +290,11 @@ class SwinTransformerModel(SRModel):
             out_dict['gt_val'] = self.gt.detach().cpu()
             out_dict['ref_val'] = self.img_ref.detach().cpu()
         return out_dict
-        # out_dict = OrderedDict()
-        # out_dict['img_in_lq'] = self.img_in_lq.detach().cpu()
-        # out_dict['rlt'] = self.output.detach().cpu()
-        # if hasattr(self, 'gt'):
-        #     out_dict['gt'] = self.gt.detach().cpu()
-        # return out_dict
-
+       
     def save(self, epoch, current_iter):
         self.save_network(self.net_g, 'net_g', current_iter)
-        # self.save_network(self.net_classifier, 'net_classifier', current_iter)
         if self.net_d:
             self.save_network(self.net_d, 'net_d', current_iter)
-        if self.net_teacher:
-            self.save_network(self.net_teacher, 'net_teacher', current_iter)
-        # if self.net_classifier:
-        #     self.save_network(self.net_classifier, 'net_classifier', current_iter)
         self.save_training_state(epoch, current_iter)
 
     def nondist_validation(self, dataloader, current_iter, tb_logger,
@@ -555,8 +313,6 @@ class SwinTransformerModel(SRModel):
             visuals = self.get_current_visuals()
             sr_img, gt_img = tensor2img([visuals['rlt'], visuals['gt_val']])
             lq_img, ref_img = tensor2img([visuals['img_in_lq'], visuals['ref_val']])
-            # sr_img, gt_img = tensor2img([visuals['rlt'], visuals['gt']])
-            # lq_img, ref_img = tensor2img([visuals['img_in_lq'], visuals['img_in_lq']])
 
             if 'padding' in val_data.keys():
                 padding = val_data['padding']

@@ -25,6 +25,11 @@ from mmsr.utils.options import dict2str, dict_to_nonedict, parse
 from mmsr.utils.util import check_resume
 
 
+try:
+    import wandb
+except ImportError:
+    wandb = None
+
 from torch.utils.tensorboard import SummaryWriter
 
 # default `log_dir` is "runs" - we'll be more specific here
@@ -79,12 +84,6 @@ def main():
 
     args = parser.parse_args()
     opt = parse(args.opt, is_train=True)
-
-    if wandb and args.use_wandb:
-        wandb.init(project='Stu_tea_SR', name=args.wandb_project_name, reinit=True)
-
-    n_gpu = int(os.environ["WORLD_SIZE"]) if "WORLD_SIZE" in os.environ else 1
-    # args.distributed = n_gpu > 1
 
     # distributed training settings
     if args.launcher == 'none':  # disabled distributed training
@@ -163,63 +162,6 @@ def main():
                 f'Total epochs needed: {total_epochs} for iters {total_iters}')
         elif phase == 'val':
             val_set = create_dataset(dataset_opt)            
-            val_loader = create_dataloader(val_set, dataset_opt, opt, None)
-            logger.info(
-                f"Number of val images/folders in {dataset_opt['name']}: "
-                f'{len(val_set)}')
-        else:
-            raise NotImplementedError(f'Phase {phase} is not recognized.')
-    assert train_loader is not None
-
-    # create model
-    model = create_model(opt)
-
-    # resume training
-    if resume_state:
-        logger.info(f"Resuming training from epoch: {resume_state['epoch']}, "
-                    f"iter: {resume_state['iter']}.")
-        start_epoch = resume_state['epoch']
-        current_iter = resume_state['iter']
-        model.resume_training(resume_state)  # handle optimizers and schedulers
-    else:
-        current_iter = 0
-        start_epoch = 0
-
-    # create message logger (formatted outputs)
-    msg_logger = MessageLogger(opt, current_iter, tb_logger)
-
-    # training
-    logger.info(
-        f'Start training from epoch: {start_epoch}, iter: {current_iter}')
-    data_time, iter_time = 0, 0
-
-    # create train and val dataloaders
-    for phase, dataset_opt in opt['datasets'].items():
-        if phase == 'train':
-            # dataset_ratio: enlarge the size of datasets for each epoch
-            dataset_enlarge_ratio = dataset_opt.get('dataset_enlarge_ratio', 1)
-            train_set = create_dataset(dataset_opt)
-            train_size = int(
-                math.ceil(len(train_set) / dataset_opt['batch_size']))
-            total_iters = int(opt['train']['niter'])
-            total_epochs = int(math.ceil(total_iters / train_size))
-            if opt['dist']:
-                train_sampler = DistIterSampler(train_set, world_size, rank,
-                                                dataset_enlarge_ratio)
-                total_epochs = total_iters / (
-                    train_size * dataset_enlarge_ratio)
-                total_epochs = int(math.ceil(total_epochs))
-            else:
-                train_sampler = None
-            train_loader = create_dataloader(train_set, dataset_opt, opt,
-                                             train_sampler)
-            logger.info(
-                f'Number of train images: {len(train_set)}, iters: {train_size}'
-            )
-            logger.info(
-                f'Total epochs needed: {total_epochs} for iters {total_iters}')
-        elif phase == 'val':
-            val_set = create_dataset(dataset_opt)
             val_loader = create_dataloader(val_set, dataset_opt, opt, None)
             logger.info(
                 f"Number of val images/folders in {dataset_opt['name']}: "

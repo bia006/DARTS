@@ -39,38 +39,3 @@ def define_net_d(opt):
 
     net_d = dynamical_instantiation(_arch_modules, network_type, opt_net)
     return net_d
-
-
-def define_net_map(opt):
-    opt_net = opt['network_map']
-    network_type = opt_net.pop('type')
-
-    net_map = dynamical_instantiation(_arch_modules, network_type, opt_net)
-    return net_map
-
-
-def define_net_extractor(opt):
-    opt_net = opt['network_extractor']
-    network_type = opt_net.pop('type')
-
-    net_extractor = dynamical_instantiation(_arch_modules, network_type,
-                                            opt_net)
-    return net_extractor
-
-
-def define_net_classifier(opt):
-    opt_net = opt['network_classifier']
-    network_type = opt_net.pop('type')
-
-    net_classifier = dynamical_instantiation(_arch_modules, network_type,
-                                            opt_net)
-    return net_classifier
-
-
-def define_net_teacher(opt):
-    opt_net = opt['network_teacher']
-    network_type = opt_net.pop('type')
-
-    net_teacher = dynamical_instantiation(_arch_modules, network_type, opt_net)
-
-    return net_teacher
